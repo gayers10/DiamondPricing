@@ -1,0 +1,468 @@
+---
+title: "Diamond Price Coding Project"
+author: "Gerald Ayers"
+date: "11/6/2024"
+output: 
+  pdf_document:
+    toc: yes
+    number_sections: true
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    df_print: paged
+    highlight: tango
+    latex_engine: xelatex 
+  html_document:
+    df_print: paged
+    toc: yes
+fontsize: 12pt
+geometry: margin=1in
+fontfamily: mathpazo
+chunk_output_type: console
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#| message: FALSE
+#| warning: FALSE
+#| echo: false
+#| include: false
+rm(list=ls(all=TRUE))
+library(ggbeeswarm)
+library(tidyr) # https://tidyr.tidyverse.org/
+library(tinytex)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(foreign)
+library(tis)
+library(FNN)
+library(tseries)
+library(forecast)
+library(cvTools)
+library(boot)
+library(rpart)
+library(lattice)
+library(MASS)
+library(car)
+require(stats)
+require(stats4)
+library(KernSmooth)
+library(fastICA)
+library(cluster)
+library(leaps)
+library(mgcv)
+library(pan)
+library(DAAG)
+library(TTR)
+library(tis)
+require("datasets")
+require(graphics)
+library(xtable)
+library(stats)
+library(TSA)
+library(fUnitRoots)
+library(fBasics)
+library(timsac)
+library(fpp)
+library(strucchange)
+library(dynlm)
+library(lmtest)
+library(broom)
+library(yarrr)
+library(seasonal)
+# library(TimeProjection)
+library(moments)
+library(quantmod)
+library(zoo)
+library(RColorBrewer)
+library(tseries, quietly = T)
+library(forecast, quietly = T)
+library(vars)
+library(caret)
+library("TTR")
+library(plotrix)
+library(nlstools)
+library(fpp2)
+library(fma)
+# library(censReg)
+library(COUNT)
+library(AER)
+library(thief)
+library(hts)
+library(gdata)
+library(rugarch)
+library(Quandl)
+# library(geckor)
+library(effects)
+library(plotly)
+library(prophet)
+library(glmnet)
+library(e1071)
+library(class)
+library(boot)
+library(stringr)
+library(vip)
+library(pls)
+library(processx)
+library(rpart)
+library(tree)
+library(randomForest)
+library(rpart.plot)
+library(faraway)
+library(fitdistrplus)
+library(ggplot2)
+library(patchwork)
+library(fitdistrplus)
+library(MASS)
+library(caret)
+library("car")
+library("olsrr")
+library("robustbase")
+library(boot)
+library(jtools)
+library(quantreg)
+library(tidyverse)
+library(tidymodels)
+library(caret)
+library(stats)
+library(pastecs)
+library(skimr)
+
+library(tidyr) # https://tidyr.tidyverse.org/
+library(tinytex)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(tibble)
+library(lubridate)
+library(faraway)
+library(carData)
+library(pastecs)
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(viridis)
+library(ggstatsplot)
+library(palmerpenguins)
+library(fitdistrplus)
+library(MASS)
+library(caret)
+library("car")
+library("olsrr")
+library("robustbase")
+library(patchwork)
+library(stargazer)
+suppressMessages(library(GGally))
+library(corrplot)
+```
+
+
+## Descriptive Analysis of all the variables
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set <- read.csv(file = "Diamonds Prices2022.csv", header = TRUE, sep = ",", stringsAsFactors = TRUE)
+head(diamonds_set)
+str(diamonds_set)
+stat.desc(diamonds_set)
+```
+These lines of code describe the diamonds_set data set by examining the structure of the data frame which describes all the column values (variables) and the statistical description for all the quantitative values in the data frame. The data frame includes, X which is just the number of the observation, carat which is a number representing the weight, cut which is a factor with 5 levels, color which is a factor with 7 levels, clarity which is a factor with 8 levels, depth which a number, table which is a number, price as an integer, and x,y,z which are all numbers of the dimensions of the diamond.
+
+##Random Sample Selection of size 300
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+set.seed(5)
+sample_size = 300
+sample_indices = sample(1:nrow(diamonds_set), size = sample_size, replace = FALSE)
+diamonds_set = diamonds_set[sample_indices,]
+skim(diamonds_set)
+```
+I selected a random sample that contains 300 samples from the diamonds data set and ran the skim function to summarize the data of the selected random sample. The skim function shows the mean, standard deviation, and quantiles for each quantitative column of the data frame, and shows the number of unique values of each factor for the categorical variables.
+
+##Distributions of Quantitative Variables
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+for (i in c(2,6,7,8,9,10,11)){
+  truehist(diamonds_set[,i], col='slategray3', 
+         main = paste(colnames(diamonds_set)[i], "Distribution"),
+         xlab= colnames(diamonds_set)[i],
+         ylab ="Proportion")
+lines(density(diamonds_set[,i]),lwd=2, col ="blue3")
+}
+
+```
+The above histograms show the distributions for each quantitative variable across the 300 samples from the random sample I selected. The carat, price, and table distributions looks right-skewed, the depth distribution looks relatively symmetric, and x,y,z seem to not follow a specific distribution trend.
+
+##Correlation Matrix to help choose independent variables
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_num = diamonds_set[,-c(1,3,4,5)]
+cor_matrix= cor(diamonds_num,use = "pairwise.complete.obs")
+corrplot(cor_matrix)
+#checking correlation between all quantitative variables
+
+cor_matrix[c("carat", "depth", "table"),
+           c("carat", "depth", "table")]
+#checking the correlation between my 3 chosen independents is low.
+```
+The above code creates the correlation matrix for the quantitative values of the data set. Based on the relatively low correlations between carat, depth, and table, these are the three quantitative independent variables I'm choosing from the diamonds data set, and the two categorical variables I'm choosing are cut and color. Based on the correlation matrix, the best pick for the dependent variable is price.
+
+##Checking Correlation between Quantitative and Categorical Variables
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+# Create a violin plot
+diamonds_set %>% ggplot(aes(x = cut, y = carat, fill = cut)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Carat across Cut",
+       x = "Cut", y = "Carat") +
+  theme_minimal()
+```
+Creating a violin plot of the categorical variable cut against carat to examine if they are correlated, from this plot we see carat and cut aren't very correlated.
+
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot(aes(x = cut, y = depth, fill = cut)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Depth across Cut",
+       x = "Cut", y = "Depth") +
+  theme_minimal()
+```
+This violin plot is used to determine the correlation between depth and cut which according to this plot appear to be not very correlated.
+
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot(aes(x = cut, y = table, fill = cut)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Table across Cut",
+       x = "Cut", y = "Table") +
+  theme_minimal()
+```
+This violin plot shows the table values across the different cuts and shows the two aren't very correlated.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot(aes(x = color, y = carat, fill = color)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Carat across Color",
+       x = "Color", y = "Carat") +
+  theme_minimal()
+```
+This plots my second chosen categorical variable color with carat and shows the two are not very correlated.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot(aes(x = color, y = depth, fill = color)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Depth across Color",
+       x = "Color", y = "Depth") +
+  theme_minimal()
+```
+This plot shows depth being plotted across color and shows the two aren't very correlated.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot(aes(x = color, y = table, fill = color)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.1, color = "black", 
+               position = position_dodge(0.9))+  
+  labs(title = "Violin of Table across Color",
+       x = "Color", y = "Table") +
+  theme_minimal()
+```
+This plot of table across color shows that the two values aren't very correlated.
+
+##Scatterplot of Independent variables vs Price
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot() + 
+  geom_point(aes(x=carat,y= price, color=carat)) +
+  labs(x="Carat", 
+       y = "Price", 
+       color = "Carat",
+       title = "Carat vs Price")+
+  scale_color_gradient(low = "pink", high = "forestgreen") +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5),  
+    axis.title.x = element_text(size = 10),  
+    axis.title.y = element_text(size = 10),  
+    axis.text.x = element_text(size = 10),   
+    axis.text.y = element_text(size = 10),
+    legend.title = element_text(size = 5),
+    legend.text = element_text(size = 10)) +
+  geom_smooth(method="lm", se=FALSE, aes(x=carat,y=price))
+```
+This plot shows strong correlation of my chosen dependent variable price and carat.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot() + 
+  geom_point(aes(x=depth,y=price, color=depth)) +
+  labs(x="Depth", 
+       y = "Price", 
+       color = "Depth",
+       title = "Depth vs Price")+
+  scale_color_gradient(low = "pink", high = "forestgreen") +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5),  
+    axis.title.x = element_text(size = 10),  
+    axis.title.y = element_text(size = 10),  
+    axis.text.x = element_text(size = 10),   
+    axis.text.y = element_text(size = 10),
+    legend.title = element_text(size = 5),
+    legend.text = element_text(size = 10)) +
+  geom_smooth(method="lm", se=FALSE, aes(x=depth,y=price))
+```
+This plot shows the slight negative correlation between depth and price as my dependent variable.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set %>% ggplot() + 
+  geom_point(aes(x=table,y=price, color=table)) +
+  labs(x="Table", 
+       y = "Price", 
+       color = "Table",
+       title = "Table vs Price")+
+  scale_color_gradient(low = "pink", high = "forestgreen") +
+  theme(plot.title = element_text(size = 10, face = "bold", hjust = 0.5),  
+    axis.title.x = element_text(size = 10),  
+    axis.title.y = element_text(size = 10),  
+    axis.text.x = element_text(size = 10),   
+    axis.text.y = element_text(size = 10),
+    legend.title = element_text(size = 5),
+    legend.text = element_text(size = 10)) +
+  geom_smooth(method="lm", se=FALSE, aes(x=table,y=price))
+```
+This plot shows the relationship between my chosen independent and dependent variable of table and price.
+
+##Multiple Linear Regression Model
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+linear_model <- lm(price ~ carat + depth + table + cut + color, data = diamonds_set)
+
+summary(linear_model)
+```
+
+The above code runs a multiple linear regression model with the dependent variable price being dependent on the five independent variables, carat, depth, table, cut and color, then observes the summary statistics for all across the 300 samples.
+
+##Expectation/Interesting Aspects of Data
+The data was mostly what I expected except the lack of correlation between cut and table of the diamonds. Upon researching the definitions of those two characteristics of diamonds, I expected them to be highly correlated, however the correlation matrix showed a relatively low correlation between these two values. The rest of the aspects of the data aligned with how I expected them. I believe my selected sample was representative of the population since I selected a high sample size of 300 observations and the data behaved as expected of the population.
+
+
+##Identify Best-Fitting Model for Dataset
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+diamonds_set = diamonds_set[, c("price", "carat", "cut", "table", "depth", "color")]
+diamonds_set
+linear_model = lm(price~., data = diamonds_set) ##full regression model from above
+lm_base = lm(price~1, data = diamonds_set) #base model for forward selection
+
+fwd = stats::step(lm_base, direction = 'forward', scope=list(upper=formula(linear_model)),
+                      trace = FALSE)
+
+bwd = stats::step(linear_model, direction = 'backward', trace = FALSE)
+
+stw = stats::step(linear_model, direction = 'both', trace = FALSE)
+
+fwd$call #best model identified from forward selection
+bwd$call #best model identified from backward selection
+stw$call #best model identified from step-wise selection
+
+bwd_reg = lm(price ~ carat + color + cut + depth + table, data = diamonds_set)
+```
+The forward, backward, and step-wise selection all return the same linear model as being the best which also happens to be the full model for my chosen dependent and independent variables, therefore the best-fitting model is the full model which is price ~ carat + depth + table + cut + color.
+
+##Detecting Multicollinearity
+```{r echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+library(car)
+knitr::kable(sort(vif(bwd_reg)))
+vif_vals_bwd = vif(bwd_reg)
+barplot(
+  vif_vals_bwd, 
+  main = "VIF",
+  col = 'skyblue3',
+  ylim = c(0, 15),
+  cex.names = 0.7,
+  width= 2
+)
+#vif_threshold1 = 4.0
+vif_threshold2 = 10
+#abline(h = vif_threshold1, lwd = 3, lty = 2, col = 'red4')
+abline(h = vif_threshold2, lwd = 3, lty = 2, col = 'gold4')
+
+mreg.mod = lm(price ~., data=diamonds_set)
+summary(mreg.mod)
+knitr::kable(sort(vif(mreg.mod)))
+
+# We can also plot the results
+vif_vals = vif(mreg.mod)
+barplot(
+  vif_vals, 
+  main = "VIF",
+  col = 'skyblue3',
+  ylim = c(0, 20),
+  cex.names = 0.4,
+  width= 2
+)
+#vif_threshold1 = 4.0
+vif_threshold2 = 10
+#abline(h = vif_threshold1, lwd = 3, lty = 2, col = 'red4')
+abline(h = vif_threshold2, lwd = 3, lty = 2, col = 'gold4')
+```
+This VIF plot shows that certain categories in the factor cut can be removed from the model, such as cutIdeal, cutPremium, and cutVery Good since their VIF is greater than 10, so we have to delete these categories from the data frame and leave only cutGood which is under the threshold.
+
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+#add cut good to data frame
+cut_good = ifelse(diamonds_set$cut == "Good", 1, 0)
+diamonds_set$cutGood = cut_good
+#drop original cut column from data frame
+diamonds_set = dplyr::select(diamonds_set, -cut)
+diamonds_set
+
+```
+The code above creates a new column and adds it to the data frame for when cut = good since this was the only value of cut that had a VIF under 10, and deletes the original cut column that contained the values of cut with VIF values greater than 10, which corrects the multicollinearity between the different cut values.
+```{r, echo=TRUE, fig.align='center', fig.height=11, fig.width=15, message=FALSE, results='markup'}
+new_lm = lm(price ~., data = diamonds_set)
+summary(new_lm)
+
+knitr::kable(sort(vif(new_lm)))
+vif_vals_bwd = vif(new_lm)
+print(vif_vals_bwd)
+barplot(
+  vif_vals_bwd, 
+  main = "VIF",
+  col = 'skyblue3',
+  ylim = c(0, 15),
+  cex.names = 0.7,
+  width= 2
+)
+#vif_threshold1 = 4.0
+vif_threshold2 = 10
+#abline(h = vif_threshold1, lwd = 3, lty = 2, col = 'red4')
+abline(h = vif_threshold2, lwd = 3, lty = 2, col = 'gold4')
+
+mreg.mod = lm(price ~., data=diamonds_set)
+summary(mreg.mod)
+knitr::kable(sort(vif(mreg.mod)))
+
+# We can also plot the results
+vif_vals = vif(mreg.mod)
+barplot(
+  vif_vals, 
+  main = "VIF",
+  col = 'skyblue3',
+  ylim = c(0, 20),
+  cex.names = 0.4,
+  width= 2
+)
+#vif_threshold1 = 4.0
+vif_threshold2 = 10
+#abline(h = vif_threshold1, lwd = 3, lty = 2, col = 'red4')
+abline(h = vif_threshold2, lwd = 3, lty = 2, col = 'gold4')
+
+```
+The code above takes the new cutGood column and creates a regression model and checks the VIF for each predictor, and all the values are under 10, showing that deleting the original cut column and replacing it with cutGood corrects the issue of multicollinearity.
